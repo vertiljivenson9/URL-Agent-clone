@@ -227,32 +227,49 @@ async def select_agent(session_id: str, agent_id: str):
     return {"sessionId": session_id, "selectedAgent": agent}
 
 
-def install_agent_dependencies(agent_dir: Path):
-    """Instala dependencias del agente si existe requirements.txt"""
-    requirements_file = agent_dir / "requirements.txt"
-    if requirements_file.exists():
+def install_agent_dependencies(agent_dir: Path, repo_root: Path):
+    """
+    Instala dependencias del agente:
+    1. Busca requirements.txt en el directorio del agente o en la raíz del repo.
+    2. Si existe, lo instala.
+    3. Si no, instala langchain por defecto (versión compatible).
+    """
+    # Buscar requirements.txt
+    requirements_found = None
+    possible_paths = [
+        agent_dir / "requirements.txt",
+        repo_root / "requirements.txt"
+    ]
+    for path in possible_paths:
+        if path.exists():
+            requirements_found = path
+            break
+    
+    if requirements_found:
+        print(f"📦 Instalando dependencias desde {requirements_found}")
         try:
             subprocess.run(
-                ["pip", "install", "-r", str(requirements_file)],
+                ["pip", "install", "-r", str(requirements_found)],
+                capture_output=True,
+                text=True,
+                timeout=120
+            )
+            print("✅ Dependencias instaladas correctamente")
+        except Exception as e:
+            print(f"⚠️ Error instalando dependencias: {e}")
+    else:
+        # Fallback: instalar langchain (versión específica que suele funcionar)
+        print("📦 No se encontró requirements.txt, instalando langchain por defecto")
+        try:
+            subprocess.run(
+                ["pip", "install", "langchain==0.1.0"],  # Versión que suele tener AgentExecutor
                 capture_output=True,
                 text=True,
                 timeout=60
             )
+            print("✅ Langchain instalado")
         except Exception as e:
-            print(f"Error instalando dependencias: {e}")
-    
-    # 🔥 NUEVO: Instalar LangChain por defecto para cualquier agente Python
-    # Esto asegura que agentes como locopilot-ai tengan LangChain disponible
-    try:
-        subprocess.run(
-            ["pip", "install", "langchain"],
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
-        print("✅ LangChain instalado automáticamente")
-    except Exception as e:
-        print(f"⚠️ No se pudo instalar LangChain automáticamente: {e}")
+            print(f"⚠️ No se pudo instalar langchain: {e}")
 
 
 @app.post("/api/chat")
@@ -272,9 +289,10 @@ async def chat(request: ChatRequest):
     
     agent_path = Path(agent["full_path"])
     working_dir = agent_path.parent
+    repo_root = REPOS_DIR / session["repo_path"]  # Raíz del repositorio clonado
 
-    # Instalar dependencias (incluye LangChain automáticamente)
-    install_agent_dependencies(working_dir)
+    # Instalar dependencias (busca en agent_dir y repo_root)
+    install_agent_dependencies(working_dir, repo_root)
     
     try:
         if agent["type"] == "agent.json":
