@@ -240,6 +240,19 @@ def install_agent_dependencies(agent_dir: Path):
             )
         except Exception as e:
             print(f"Error instalando dependencias: {e}")
+    
+    # 🔥 NUEVO: Instalar LangChain por defecto para cualquier agente Python
+    # Esto asegura que agentes como locopilot-ai tengan LangChain disponible
+    try:
+        subprocess.run(
+            ["pip", "install", "langchain"],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        print("✅ LangChain instalado automáticamente")
+    except Exception as e:
+        print(f"⚠️ No se pudo instalar LangChain automáticamente: {e}")
 
 
 @app.post("/api/chat")
@@ -260,7 +273,7 @@ async def chat(request: ChatRequest):
     agent_path = Path(agent["full_path"])
     working_dir = agent_path.parent
 
-    # 🔥 NUEVO: Instalar dependencias del agente si existen
+    # Instalar dependencias (incluye LangChain automáticamente)
     install_agent_dependencies(working_dir)
     
     try:
