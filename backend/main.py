@@ -110,7 +110,7 @@ def detect_agents(repo_path: Path) -> List[Dict[str, Any]]:
                     "description": "Agent detected in repository",
                     "icon": "🤖",
                     "path": str(relative_path),
-                    "full_path": str(file_path.resolve()),  # 🔥 CORREGIDO: usa ruta absoluta
+                    "full_path": str(file_path.resolve()),
                     "type": file
                 }
                 
@@ -227,6 +227,21 @@ async def select_agent(session_id: str, agent_id: str):
     return {"sessionId": session_id, "selectedAgent": agent}
 
 
+def install_agent_dependencies(agent_dir: Path):
+    """Instala dependencias del agente si existe requirements.txt"""
+    requirements_file = agent_dir / "requirements.txt"
+    if requirements_file.exists():
+        try:
+            subprocess.run(
+                ["pip", "install", "-r", str(requirements_file)],
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+        except Exception as e:
+            print(f"Error instalando dependencias: {e}")
+
+
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     session = get_session(request.sessionId)
@@ -244,13 +259,15 @@ async def chat(request: ChatRequest):
     
     agent_path = Path(agent["full_path"])
     working_dir = agent_path.parent
+
+    # 🔥 NUEVO: Instalar dependencias del agente si existen
+    install_agent_dependencies(working_dir)
     
     try:
         if agent["type"] == "agent.json":
             with open(agent_path, 'r', encoding='utf-8') as f:
                 config = json.load(f)
             command = config.get("command", ["python", "agent.py"])
-            # Asegurar que command sea una lista
             if isinstance(command, str):
                 command = command.split()
             result = subprocess.run(command, cwd=working_dir, capture_output=True, text=True, env=env, timeout=30)
