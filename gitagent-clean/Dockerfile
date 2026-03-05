@@ -1,1 +1,31 @@
-data:application/octet-stream;base64,RlJPTSBweXRob246My4xMS1zbGltCgpFTlYgUFlUSE9ORE9OVFdSSVRFQllURUNPREU9MQpFTlYgUFlUSE9OVU5CVUZGRVJFRD0xCkVOViBQT1JUPTgwMDAKClJVTiBhcHQtZ2V0IHVwZGF0ZSAmJiBhcHQtZ2V0IGluc3RhbGwgLXkgZ2l0IGN1cmwgJiYgcm0gLXJmIC92YXIvbGliL2FwdC9saXN0cy8qCgpSVU4gY3VybCAtZnNTTCBodHRwczovL2RlYi5ub2Rlc291cmNlLmNvbS9zZXR1cF8xOC54IHwgYmFzaCAtICYmIFwKICAgIGFwdC1nZXQgaW5zdGFsbCAteSBub2RlanMgJiYgcm0gLXJmIC92YXIvbGliL2FwdC9saXN0cy8qCgpXT1JLRElSIC9hcHAKCkNPUFkgYmFja2VuZC9yZXF1aXJlbWVudHMudHh0IC4vYmFja2VuZC8KUlVOIHBpcCBpbnN0YWxsIC0tbm8tY2FjaGUtZGlyIC1yIGJhY2tlbmQvcmVxdWlyZW1lbnRzLnR4dAoKQ09QWSBmcm9udGVuZC9wYWNrYWdlKi5qc29uIC4vZnJvbnRlbmQvClJVTiBjZCBmcm9udGVuZCAmJiBucG0gaW5zdGFsbAoKQ09QWSAuIC4KClJVTiBjZCBmcm9udGVuZCAmJiBucG0gcnVuIGJ1aWxkCgpSVU4gbWtkaXIgLXAgZGF0YS9yZXBvcyBkYXRhL3Byb2plY3RzCgpFWFBPU0UgODAwMAoKSEVBTFRIQ0hFQ0sgLS1pbnRlcnZhbD0zMHMgLS10aW1lb3V0PTEwcyAtLXN0YXJ0LXBlcmlvZD01cyAtLXJldHJpZXM9MyBcCiAgICBDTUQgY3VybCAtZiBodHRwOi8vbG9jYWxob3N0OjgwMDAvYXBpL2hlYWx0aCB8fCBleGl0IDEKCkNNRCBjZCBiYWNrZW5kICYmIHV2aWNvcm4gbWFpbjphcHAgLS1ob3N0IDAuMC4wLjAgLS1wb3J0ICR7UE9SVH0K
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PORT=8000
+
+RUN apt-get update && apt-get install -y git curl && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY backend/requirements.txt ./backend/
+RUN pip install --no-cache-dir -r backend/requirements.txt
+
+COPY frontend/package*.json ./frontend/
+RUN cd frontend && npm install
+
+COPY . .
+
+RUN cd frontend && npm run build
+
+RUN mkdir -p data/repos data/projects
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/api/health || exit 1
+
+CMD cd backend && uvicorn main:app --host 0.0.0.0 --port ${PORT}
