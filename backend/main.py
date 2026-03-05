@@ -1,4 +1,6 @@
-"""GitAgent-Clon Backend - FastAPI Application"""
+"""
+GitAgent-Clon Backend - FastAPI Application
+"""
 import os
 import json
 import shutil
@@ -108,7 +110,7 @@ def detect_agents(repo_path: Path) -> List[Dict[str, Any]]:
                     "description": "Agent detected in repository",
                     "icon": "🤖",
                     "path": str(relative_path),
-                    "full_path": str(file_path),
+                    "full_path": str(file_path.resolve()),  # 🔥 CORREGIDO: usa ruta absoluta
                     "type": file
                 }
                 
@@ -248,6 +250,9 @@ async def chat(request: ChatRequest):
             with open(agent_path, 'r', encoding='utf-8') as f:
                 config = json.load(f)
             command = config.get("command", ["python", "agent.py"])
+            # Asegurar que command sea una lista
+            if isinstance(command, str):
+                command = command.split()
             result = subprocess.run(command, cwd=working_dir, capture_output=True, text=True, env=env, timeout=30)
         elif agent["type"] in ["agent.py", "main.py"]:
             result = subprocess.run(["python", str(agent_path)], cwd=working_dir, capture_output=True, text=True, env=env, timeout=30)
